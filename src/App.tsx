@@ -14,9 +14,19 @@ import { ALPHABET_DATA, Language, AlphabetItem } from './data';
 export default function App() {
   const [lang, setLang] = useState<Language>('es');
   const [selectedLetter, setSelectedLetter] = useState<AlphabetItem | null>(null);
+  const [modalLang, setModalLang] = useState<Language>('es');
   const [score, setScore] = useState(0);
   const [gameMode, setGameMode] = useState(false);
   const [targetLetter, setTargetLetter] = useState<AlphabetItem | null>(null);
+  const [gameFeedback, setGameFeedback] = useState<{
+    letter: string;
+    type: 'correct' | 'wrong';
+    emoji: string;
+    message: string;
+  } | null>(null);
+  const [roundStartedAt, setRoundStartedAt] = useState<number | null>(null);
+  const [correctStreak, setCorrectStreak] = useState(0);
+  const [wrongStreak, setWrongStreak] = useState(0);
 
   const languages = [
     { code: 'es', name: 'Español', flag: '🇪🇸', letterCount: 27 },
@@ -51,28 +61,130 @@ export default function App() {
       description: 'Tutki kirjaimia kolmella eri kielellä. Klikkaa jokaista korttia ja löydä eläimiä sekä muita hauskoja asioita.',
     },
   } as const;
+  const gameFeedbackText = {
+    es: {
+      streak: '¡Racha increíble!',
+      fast: '¡Rapidísimo!',
+      correct: '¡Muy bien!',
+      wrong: 'Casi, intenta otra vez',
+      wrongStreak: 'No pasa nada, probemos otra vez',
+    },
+    en: {
+      streak: 'Awesome streak!',
+      fast: 'So fast!',
+      correct: 'Great job!',
+      wrong: 'Close! Try again',
+      wrongStreak: "It's okay, let's try again",
+    },
+    fi: {
+      streak: 'Upea putki!',
+      fast: 'Todella nopea!',
+      correct: 'Hienoa!',
+      wrong: 'Lähellä, yritä uudelleen',
+      wrongStreak: 'Ei haittaa, kokeillaan uudestaan',
+    },
+  } as const;
 
   const startNewGame = () => {
     const randomLetter = visibleAlphabetData[Math.floor(Math.random() * visibleAlphabetData.length)];
     setTargetLetter(randomLetter);
+    setGameFeedback(null);
+    setRoundStartedAt(Date.now());
+    setCorrectStreak(0);
+    setWrongStreak(0);
     setGameMode(true);
+  };
+
+  const stopGame = () => {
+    setGameMode(false);
+    setGameFeedback(null);
+    setTargetLetter(null);
+    setRoundStartedAt(null);
+    setCorrectStreak(0);
+    setWrongStreak(0);
   };
 
   const handleCardClick = (item: AlphabetItem) => {
     if (gameMode && targetLetter) {
+      if (gameFeedback) return;
       if (item.letter === targetLetter.letter) {
+        const elapsedMs = roundStartedAt ? Date.now() - roundStartedAt : Number.MAX_SAFE_INTEGER;
+        const nextCorrectStreak = correctStreak + 1;
         setScore(prev => prev + 10);
-        const nextLetter = visibleAlphabetData[Math.floor(Math.random() * visibleAlphabetData.length)];
-        setTargetLetter(nextLetter);
+        setWrongStreak(0);
+        setCorrectStreak(nextCorrectStreak);
+        const correctFeedback =
+          nextCorrectStreak >= 3
+            ? { emoji: '🔥👏', message: gameFeedbackText[lang].streak }
+            : elapsedMs <= 1500
+              ? { emoji: '🤩🎉', message: gameFeedbackText[lang].fast }
+              : { emoji: '😊✨', message: gameFeedbackText[lang].correct };
+        setGameFeedback({ letter: item.letter, type: 'correct', ...correctFeedback });
+        playGameSound('correct');
+        window.setTimeout(() => {
+          const nextLetter = visibleAlphabetData[Math.floor(Math.random() * visibleAlphabetData.length)];
+          setTargetLetter(nextLetter);
+          setRoundStartedAt(Date.now());
+          setGameFeedback(null);
+        }, 700);
       } else {
+        const nextWrongStreak = wrongStreak + 1;
         setScore(prev => Math.max(0, prev - 5));
+        setCorrectStreak(0);
+        setWrongStreak(nextWrongStreak);
+        const wrongFeedback =
+          nextWrongStreak >= 2
+            ? { emoji: '😢💧', message: gameFeedbackText[lang].wrongStreak }
+            : { emoji: '😕', message: gameFeedbackText[lang].wrong };
+        setGameFeedback({ letter: item.letter, type: 'wrong', ...wrongFeedback });
+        playGameSound('wrong');
+        window.setTimeout(() => {
+          setGameFeedback(null);
+        }, 700);
       }
     } else {
       setSelectedLetter(item);
+      setModalLang(lang);
     }
   };
 
   const currentExample = (item: AlphabetItem) => item.examples[lang];
+
+  const playGameSound = (type: 'correct' | 'wrong') => {
+    if (typeof window === 'undefined') return;
+    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioCtx) return;
+
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.connect(ctx.destination);
+
+    const tone = (freq: number, start: number, duration: number, wave: OscillatorType = 'sine') => {
+      const osc = ctx.createOscillator();
+      osc.type = wave;
+      osc.frequency.setValueAtTime(freq, start);
+      osc.connect(gain);
+      osc.start(start);
+      osc.stop(start + duration);
+    };
+
+    if (type === 'correct') {
+      // Friendly "happy sparkle": short bright arpeggio
+      gain.gain.exponentialRampToValueAtTime(0.14, now + 0.01);
+      tone(784, now, 0.08, 'triangle');
+      tone(988, now + 0.08, 0.08, 'triangle');
+      tone(1318, now + 0.16, 0.12, 'triangle');
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.36);
+    } else {
+      // Soft "uh-oh": gentle descending two-tone, not harsh buzzer
+      gain.gain.exponentialRampToValueAtTime(0.09, now + 0.01);
+      tone(392, now, 0.12, 'sine');
+      tone(294, now + 0.12, 0.14, 'sine');
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+    }
+  };
 
   return (
     <div className="min-h-screen pb-20 bg-brand-soft">
@@ -114,7 +226,7 @@ export default function App() {
             <span className="font-bold text-brand-dark">{score}</span>
           </div>
           <button 
-            onClick={() => gameMode ? setGameMode(false) : startNewGame()}
+            onClick={() => gameMode ? stopGame() : startNewGame()}
             className={`p-2.5 rounded-2xl transition-all shadow-lg hover:scale-110 active:scale-95 ${
               gameMode ? 'bg-red-500 text-white' : 'bg-brand-secondary text-white'
             }`}
@@ -126,6 +238,37 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-8 mt-8">
+        <AnimatePresence>
+          {gameMode && gameFeedback && (
+            <motion.div
+              key={`overlay-${gameFeedback.type}-${gameFeedback.letter}`}
+              initial={{ opacity: 0, y: -8, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.9 }}
+              className="fixed top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+            >
+              <div
+                className={`px-5 py-3 rounded-2xl shadow-xl text-center ${
+                  gameFeedback.type === 'correct'
+                    ? 'bg-emerald-100 border border-emerald-300'
+                    : 'bg-rose-100 border border-rose-300'
+                }`}
+              >
+                <div className="text-3xl sm:text-4xl mb-1">
+                  {gameFeedback.emoji}
+                </div>
+                <div
+                  className={`text-sm sm:text-base font-bold ${
+                    gameFeedback.type === 'correct' ? 'text-emerald-700' : 'text-rose-700'
+                  }`}
+                >
+                  {gameFeedback.message}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Hero / Game Info */}
         <AnimatePresence mode="wait">
           {gameMode ? (
@@ -181,7 +324,11 @@ export default function App() {
                 whileTap={{ scale: 0.95 }}
                 onClick={() => handleCardClick(item)}
                 className={`relative group h-48 sm:h-56 rounded-[2.5rem] p-6 flex flex-col items-center justify-between transition-all shadow-xl hover:shadow-2xl overflow-hidden ${
-                  gameMode && targetLetter?.letter === item.letter ? 'ring-4 ring-brand-secondary ring-offset-4' : ''
+                  gameMode && gameFeedback?.letter === item.letter
+                    ? gameFeedback.type === 'correct'
+                      ? 'ring-4 ring-emerald-500 ring-offset-2 bg-emerald-50'
+                      : 'ring-4 ring-rose-500 ring-offset-2 bg-rose-50'
+                    : ''
                 }`}
                 style={{ backgroundColor: 'white' }}
               >
@@ -242,19 +389,25 @@ export default function App() {
                 <div className="flex items-start sm:items-center justify-between gap-4 mb-8">
                   <div>
                     <h3 className="text-3xl sm:text-4xl font-display font-black text-brand-dark mb-2 break-words">
-                      {currentExample(selectedLetter).word}
+                      {selectedLetter.examples[modalLang].word}
                     </h3>
                     <div className="flex gap-2">
                       {languages.map(l => (
-                        <span key={l.code} className={`px-2 py-1 rounded-lg text-xs font-bold ${lang === l.code ? 'bg-brand-primary text-white' : 'bg-gray-100 text-gray-500'}`}>
+                        <button
+                          key={l.code}
+                          onClick={() => setModalLang(l.code as Language)}
+                          className={`px-2 py-1 rounded-lg text-xs font-bold transition-colors ${
+                            modalLang === l.code ? 'bg-brand-primary text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}
+                        >
                           {l.code.toUpperCase()}
-                        </span>
+                        </button>
                       ))}
                     </div>
                   </div>
                   <div className={`p-4 sm:p-6 rounded-3xl ${selectedLetter.color} bg-opacity-10 shrink-0`}>
                     {(() => {
-                      const Icon = currentExample(selectedLetter).icon;
+                      const Icon = selectedLetter.examples[modalLang].icon;
                       return (
                         <Icon
                           className={`w-12 h-12 sm:w-16 sm:h-16 ${
@@ -269,7 +422,7 @@ export default function App() {
                 </div>
 
                 <p className="text-base sm:text-xl text-gray-600 leading-relaxed mb-8">
-                  {currentExample(selectedLetter).description}
+                  {selectedLetter.examples[modalLang].description}
                 </p>
 
                 <div className="grid grid-cols-1 gap-4">
@@ -293,8 +446,8 @@ export default function App() {
 
                 <button 
                   onClick={() => {
-                    const msg = new SpeechSynthesisUtterance(currentExample(selectedLetter).word);
-                    msg.lang = lang === 'fi' ? 'fi-FI' : lang === 'es' ? 'es-ES' : 'en-US';
+                    const msg = new SpeechSynthesisUtterance(selectedLetter.examples[modalLang].word);
+                    msg.lang = modalLang === 'fi' ? 'fi-FI' : modalLang === 'es' ? 'es-ES' : 'en-US';
                     window.speechSynthesis.speak(msg);
                   }}
                   className="w-full mt-8 bg-brand-primary hover:bg-brand-primary/90 text-white font-bold py-4 rounded-2xl shadow-lg shadow-brand-primary/20 flex items-center justify-center gap-3 transition-all active:scale-95"
