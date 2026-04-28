@@ -26,6 +26,11 @@ export default function App() {
   const currentLanguage = languages.find((l) => l.code === lang);
   const hiddenLetters = lang === 'fi' ? ['CH', 'LL', 'Ñ'] : lang === 'es' ? ['Å', 'Ä', 'Ö'] : ['CH', 'LL', 'Ñ', 'Å', 'Ä', 'Ö'];
   const visibleAlphabetData = ALPHABET_DATA.filter((item) => !hiddenLetters.includes(item.letter));
+  const headerLogoByLanguage = {
+    es: '/Logo-1-caracol.svg',
+    en: '/Logo-3-caracol.svg',
+    fi: '/Logo-2-caracol.svg',
+  } as const;
   const welcomeCopy = {
     es: {
       titlePrefix: '¡Aprendamos el ',
@@ -74,8 +79,12 @@ export default function App() {
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white/70 backdrop-blur-lg border-b border-brand-primary/10 px-4 py-4 sm:px-8 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-2">
-          <div className="bg-brand-primary p-2 rounded-xl shadow-lg">
-            <Sparkles className="text-white w-6 h-6" />
+          <div className="bg-transparent p-0">
+            <img
+              src={headerLogoByLanguage[lang]}
+              alt="Mundo Alfabeto logo"
+              className="w-12 h-12 sm:w-14 sm:h-14 object-contain"
+            />
           </div>
           <h1 className="text-2xl font-display font-bold text-brand-dark tracking-tight">
             Mundo<span className="text-brand-primary">Alfabeto</span>
