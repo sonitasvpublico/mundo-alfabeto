@@ -29,8 +29,8 @@ export default function App() {
   const [wrongStreak, setWrongStreak] = useState(0);
 
   const languages = [
-    { code: 'es', name: 'Español', flag: '🇪🇸', letterCount: 27 },
-    { code: 'en', name: 'English', flag: '🇬🇧', letterCount: 26 },
+    { code: 'es', name: 'Español', flag: '🇸🇻', letterCount: 27 },
+    { code: 'en', name: 'English', flag: '🇺🇸', letterCount: 26 },
     { code: 'fi', name: 'Suomi', flag: '🇫🇮', letterCount: 29 },
   ];
   const currentLanguage = languages.find((l) => l.code === lang);
