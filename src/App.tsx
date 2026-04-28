@@ -191,7 +191,7 @@ export default function App() {
       {/* Header */}
       <header
         className="sticky top-0 z-40 bg-white/70 backdrop-blur-lg border-b border-brand-primary/10 px-4 py-4 sm:px-8 flex flex-wrap items-center justify-between gap-4"
-        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
+        style={{ paddingTop: 'max(calc(env(safe-area-inset-top, 0px) + 0.65rem), 2.2rem)' }}
       >
         <div className="flex items-center gap-2">
           <div className="bg-transparent p-0">
