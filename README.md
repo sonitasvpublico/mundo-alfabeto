@@ -25,3 +25,10 @@ Aplicacion web educativa para aprender letras y palabras de forma interactiva.
 - Definir roadmap por fases (MVP, mejoras, escalado).
 - Agregar tests basicos para componentes clave.
 - Preparar deploy con variables de entorno separadas por ambiente.
+
+## Licencia
+
+Copyright (c) 2026 SonitaSV.
+
+All rights reserved. No se permite el uso, copia, modificacion o distribucion
+de este codigo sin autorizacion escrita previa.
